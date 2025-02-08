@@ -23,7 +23,7 @@ const sessionHandler = (socket) => {
         return;
       }
       await waitForNestedObject(setupSessionReturn.client, 'pupPage');
-      socket.emit('sessionStarted', { success: true, message: setupSessionReturn.message });
+      socket.emit("waClient",{event:"sessionStarted",sessionId, data: setupSessionReturn.message})
     } catch (error) {
       socket.emit('sessionError', { success: false, message: error.message });
     }
@@ -38,7 +38,7 @@ const sessionHandler = (socket) => {
     try {
       const { sessionId } = data;
       const sessionData = await validateSession(sessionId);
-      socket.emit('sessionStatus', sessionData);
+      socket.emit("waClient",{event:"sessionStatus",sessionId, data: sessionData})
     } catch (error) {
       socket.emit('sessionError', { success: false, message: error.message });
     }
@@ -59,7 +59,7 @@ const sessionHandler = (socket) => {
       }
       if (session.qr) {
         const qrImageUrl = await QRCode.toDataURL(session.qr);
-        socket.emit('sessionQrCode', { success: true, qr: qrImageUrl });
+        socket.emit("waClient",{event:"sessionQrCode",sessionId, data: qrImageUrl})
       } else {
         socket.emit('sessionError', { success: false, message: 'QR code not ready or already scanned' });
       }
@@ -82,7 +82,7 @@ const sessionHandler = (socket) => {
         return;
       }
       await reloadSession(sessionId);
-      socket.emit('sessionRestarted', { success: true, message: 'Restarted successfully' });
+      socket.emit("waClient",{event:"sessionRestarted",sessionId, data: 'Restarted successfully'})
     } catch (error) {
       socket.emit('sessionError', { success: false, message: error.message });
     }
@@ -102,31 +102,20 @@ const sessionHandler = (socket) => {
         return;
       }
       await deleteSession(sessionId, validation);
-      socket.emit('sessionTerminated', { success: true, message: 'Logged out successfully' });
+      socket.emit("waClient",{event:"sessionTerminated",sessionId, data: 'Logged out successfully'})
     } catch (error) {
       socket.emit('sessionError', { success: false, message: error.message });
     }
   });
 
-  /**
-   * Terminates all inactive sessions.
-   */
-  socket.on('terminateInactiveSessions', async () => {
-    try {
-      await flushSessions(true);
-      socket.emit('inactiveSessionsTerminated', { success: true, message: 'Flush completed successfully' });
-    } catch (error) {
-      socket.emit('sessionError', { success: false, message: error.message });
-    }
-  });
-
+ 
   /**
    * Terminates all sessions.
    */
   socket.on('terminateAllSessions', async () => {
     try {
       await flushSessions(false);
-      socket.emit('allSessionsTerminated', { success: true, message: 'Flush completed successfully' });
+      socket.emit("waClient",{event:"allSessionsTerminated",sessionId, data: 'Flush completed successfully'})
     } catch (error) {
       socket.emit('sessionError', { success: false, message: error.message });
     }

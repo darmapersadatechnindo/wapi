@@ -5,7 +5,7 @@ const QRCode = require('qrcode');
 const sessions = new Map()
 const { baseWebhookURL, sessionFolderPath, maxAttachmentSize, setMessagesAsSeen, webVersion, webVersionCacheType, recoverSessions } = require('./config')
 const { triggerWebhook, waitForNestedObject, checkIfEventisEnabled } = require('./utils')
-const {io} = require("./Socket")
+const { io } = require("./Socket")
 // Function to validate if the session is ready
 const validateSession = async (sessionId) => {
   try {
@@ -52,7 +52,7 @@ const validateSession = async (sessionId) => {
     // Session Connected 🎉
     returnData.success = true
     returnData.message = 'session_connected'
-    io.emit("waClient",{event:"validateSession",sessionId, data : returnData})
+    io.emit("waClient", { event: "validateSession", sessionId, data: returnData })
     return returnData
   } catch (error) {
     console.log(error)
@@ -89,7 +89,7 @@ const restoreSessions = () => {
 const setupSession = (sessionId) => {
   try {
     if (sessions.has(sessionId)) {
-      io.emit("waClient",{event:"startSession",sessionId, data: `Session already exists for: ${sessionId}`})
+      io.emit("waClient", { event: "startSession", sessionId, data: `Session already exists for: ${sessionId}` })
       return { success: false, message: `Session already exists for: ${sessionId}`, client: sessions.get(sessionId) }
     }
 
@@ -137,13 +137,54 @@ const setupSession = (sessionId) => {
 
     // Save the session to the Map
     sessions.set(sessionId, client)
-    io.emit("waClient",{event:"startSession",sessionId, data: 'Session initiated successfully'})
+    io.emit("waClient", { event: "startSession", sessionId, data: 'Session initiated successfully' })
     return { success: true, message: 'Session initiated successfully', client }
   } catch (error) {
     return { success: false, message: error.message, client: null }
   }
 }
+const UpdateChats = async (client, sessionId) => {
+  const state = await client.getState();
+  if (state && state === "CONNECTED") {
+    setTimeout(async () => {
+      const chats = await client.getChats();
+      const listChats = await Promise.all(chats.map(async (chat) => {
+        const lastMsg = chat.lastMessage?._data; // Cek jika lastMessage ada
+        const msg = lastMsg?.type !== "chat"
+          ? (lastMsg?.caption || null)
+          : lastMsg?.body || null;
 
+        return {
+          id: chat.id._serialized,
+          name: chat.name,
+          fromMe: lastMsg?.id?.fromMe || false,
+          message: msg,
+          ack: lastMsg?.ack || 0,
+          Type: lastMsg?.type || "unknown",
+          pinned: chat.pinned || false,
+          hasMedia: lastMsg?.hasMedia || false,
+          unreadCount: chat.unreadCount,
+          timestamp: chat.lastMessage?.timestamp,
+        };
+      }));
+      io.emit("waClient", { event: "chats", sessionId, data: listChats })
+    }, 1000);
+  }
+};
+const updateMessage = async (client, chatId, sessionId) => {
+  const validation = await validateSession(sessionId)
+  if (validation.message === 'Not Found') {
+    triggerWebhook("waClient", sessionId, "getcontact", validation.message)
+    return
+  }
+
+  const contact = await client.getContactById(chatId)
+  const foto = await contact.getProfilePicUrl();
+  const chat = await client.getChatById(chatId)
+  const chats = await chat.fetchMessages({ limit: 50 })
+  const data = { ...contact, foto, chats }
+  io.emit("waClient", { event: "getcontact", sessionId, data: data })
+}
 const initializeEvents = (client, sessionId) => {
   // check if the session webhook is overridden
   const sessionWebhook = process.env[sessionId.toUpperCase() + '_WEBHOOK_URL'] || baseWebhookURL
@@ -172,7 +213,7 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('auth_failure', (msg) => {
         triggerWebhook(sessionWebhook, sessionId, 'status', { msg })
-        io.emit("waClient",{event:"auth_failure",sessionId, data: msg})
+        io.emit("waClient", { event: "auth_failure", sessionId, data: msg })
       })
     })
 
@@ -180,7 +221,7 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('authenticated', () => {
         triggerWebhook(sessionWebhook, sessionId, 'authenticated')
-        io.emit("waClient",{event:"authenticated",sessionId, data: null})
+        io.emit("waClient", { event: "authenticated", sessionId, data: null })
       })
     })
 
@@ -188,7 +229,7 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('call', async (call) => {
         triggerWebhook(sessionWebhook, sessionId, 'call', { call })
-        io.emit("waClient",{event:"call",sessionId, data: call})
+        io.emit("waClient", { event: "call", sessionId, data: call })
       })
     })
 
@@ -196,7 +237,10 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('change_state', state => {
         triggerWebhook(sessionWebhook, sessionId, 'change_state', { state })
-        io.emit("waClient",{event:"change_statecall",sessionId, data: state})
+        io.emit("waClient", { event: "change_statecall", sessionId, data: state })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+        }, 500);
       })
     })
 
@@ -204,7 +248,7 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('disconnected', (reason) => {
         triggerWebhook(sessionWebhook, sessionId, 'disconnected', { reason })
-        io.emit("waClient",{event:"disconnected",sessionId, data: reason})
+        io.emit("waClient", { event: "disconnected", sessionId, data: reason })
       })
     })
 
@@ -212,7 +256,10 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('group_join', (notification) => {
         triggerWebhook(sessionWebhook, sessionId, 'group_join', { notification })
-        io.emit("waClient",{event:"group_join",sessionId, data: notification})
+        io.emit("waClient", { event: "group_join", sessionId, data: notification })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+        }, 500);
       })
     })
 
@@ -220,7 +267,10 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('group_leave', (notification) => {
         triggerWebhook(sessionWebhook, sessionId, 'group_leave', { notification })
-        io.emit("waClient",{event:"group_leave",sessionId, data: notification})
+        io.emit("waClient", { event: "group_leave", sessionId, data: notification })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+        }, 500);
       })
     })
 
@@ -228,7 +278,10 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('group_update', (notification) => {
         triggerWebhook(sessionWebhook, sessionId, 'group_update', { notification })
-        io.emit("waClient",{event:"group_update",sessionId, data: notification})
+        io.emit("waClient", { event: "group_update", sessionId, data: notification })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+        }, 500);
       })
     })
 
@@ -236,7 +289,10 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('loading_screen', (percent, message) => {
         triggerWebhook(sessionWebhook, sessionId, 'loading_screen', { percent, message })
-        io.emit("waClient",{event:"loading_screen",sessionId, data: {percent, message}})
+        io.emit("waClient", { event: "loading_screen", sessionId, data: { percent, message } })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+        }, 500);
       })
     })
 
@@ -244,7 +300,10 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('media_uploaded', (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'media_uploaded', { message })
-        io.emit("waClient",{event:"media_uploaded",sessionId, data: message})
+        io.emit("waClient", { event: "media_uploaded", sessionId, data: message })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+        }, 500);
       })
     })
 
@@ -252,17 +311,21 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message', async (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message', { message })
-        io.emit("waClient",{event:"message",sessionId, data: message})
+        io.emit("waClient", { event: "message", sessionId, data: message })
         if (message.hasMedia && message._data?.size < maxAttachmentSize) {
           checkIfEventisEnabled('media').then(_ => {
             message.downloadMedia().then(messageMedia => {
               triggerWebhook(sessionWebhook, sessionId, 'media', { messageMedia, message })
-              io.emit("waClient",{event:"media",sessionId, data: { messageMedia, message }})
+              io.emit("waClient", { event: "media", sessionId, data: { messageMedia, message } })
             }).catch(e => {
               console.log('Download media error:', e.message)
             })
           })
         }
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message.from, sessionId)
+        }, 500);
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
           chat.sendSeen()
@@ -274,11 +337,16 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message_ack', async (message, ack) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_ack', { message, ack })
-        io.emit("waClient",{event:"message_ack",sessionId, data: { message, ack }})
+        io.emit("waClient", { event: "message_ack", sessionId, data: { message, ack } })
+
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
           chat.sendSeen()
         }
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -286,11 +354,15 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message_create', async (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_create', { message })
-        io.emit("waClient",{event:"message_ack",sessionId, data: message })
+        io.emit("waClient", { event: "message_ack", sessionId, data: message })
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
           chat.sendSeen()
         }
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -298,7 +370,10 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message_reaction', (reaction) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_reaction', { reaction })
-        io.emit("waClient",{event:"message_reaction",sessionId, data: reaction })
+        io.emit("waClient", { event: "message_reaction", sessionId, data: reaction })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+        }, 500);
       })
     })
 
@@ -306,7 +381,11 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message_edit', (message, newBody, prevBody) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_edit', { message, newBody, prevBody })
-        io.emit("waClient",{event:"message_edit",sessionId, data: { message, newBody, prevBody } })
+        io.emit("waClient", { event: "message_edit", sessionId, data: { message, newBody, prevBody } })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -314,7 +393,11 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message_ciphertext', (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_ciphertext', { message })
-        io.emit("waClient",{event:"message_ciphertext",sessionId, data: message })
+        io.emit("waClient", { event: "message_ciphertext", sessionId, data: message })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -324,7 +407,11 @@ const initializeEvents = (client, sessionId) => {
       client.on('message_revoke_everyone', async (message) => {
         // eslint-disable-next-line camelcase
         triggerWebhook(sessionWebhook, sessionId, 'message_revoke_everyone', { message })
-        io.emit("waClient",{event:"message_revoke_everyone",sessionId, data: message })
+        io.emit("waClient", { event: "message_revoke_everyone", sessionId, data: message })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -332,7 +419,11 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message_revoke_me', async (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_revoke_me', { message })
-        io.emit("waClient",{event:"message_revoke_me",sessionId, data: message })
+        io.emit("waClient", { event: "message_revoke_me", sessionId, data: message })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -342,7 +433,7 @@ const initializeEvents = (client, sessionId) => {
     const qrImageUrl = await QRCode.toDataURL(qr);
     checkIfEventisEnabled('qr')
       .then(_ => {
-        io.emit("waClient",{event:"qr",sessionId, data: qrImageUrl })
+        io.emit("waClient", { event: "qr", sessionId, data: qrImageUrl })
         triggerWebhook(sessionWebhook, sessionId, 'qr', { qr })
       })
   })
@@ -350,7 +441,7 @@ const initializeEvents = (client, sessionId) => {
   checkIfEventisEnabled('ready')
     .then(_ => {
       client.on('ready', () => {
-        io.emit("waClient",{event:"ready",sessionId, data: null })
+        io.emit("waClient", { event: "ready", sessionId, data: null })
         triggerWebhook(sessionWebhook, sessionId, 'ready')
       })
     })
@@ -359,7 +450,7 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('contact_changed', async (message, oldId, newId, isContact) => {
         triggerWebhook(sessionWebhook, sessionId, 'contact_changed', { message, oldId, newId, isContact })
-        io.emit("waClient",{event:"contact_changed",sessionId, data:  { message, oldId, newId, isContact } })
+        io.emit("waClient", { event: "contact_changed", sessionId, data: { message, oldId, newId, isContact } })
       })
     })
 
@@ -367,7 +458,11 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('chat_removed', async (chat) => {
         triggerWebhook(sessionWebhook, sessionId, 'chat_removed', { chat })
-        io.emit("waClient",{event:"chat_removed",sessionId, data:  chat })
+        io.emit("waClient", { event: "chat_removed", sessionId, data: chat })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -375,7 +470,11 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('chat_archived', async (chat, currState, prevState) => {
         triggerWebhook(sessionWebhook, sessionId, 'chat_archived', { chat, currState, prevState })
-        io.emit("waClient",{event:"chat_archived",sessionId, data:  { chat, currState, prevState } })
+        io.emit("waClient", { event: "chat_archived", sessionId, data: { chat, currState, prevState } })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 
@@ -383,7 +482,11 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('unread_count', async (chat) => {
         triggerWebhook(sessionWebhook, sessionId, 'unread_count', { chat })
-        io.emit("waClient",{event:"unread_count",sessionId, data:  chat })
+        io.emit("waClient", { event: "unread_count", sessionId, data: chat })
+        setTimeout(() => {
+          UpdateChats(client, sessionId)
+          updateMessage(client, message._data.id.remote, sessionId)
+        }, 500);
       })
     })
 }
@@ -433,7 +536,7 @@ const reloadSession = async (sessionId) => {
     }
     sessions.delete(sessionId)
     setupSession(sessionId)
-    
+
   } catch (error) {
     console.log(error)
     throw error

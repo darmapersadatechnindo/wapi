@@ -1,10 +1,17 @@
 const express = require('express')
 const http = require('http')
+const https = require("https");
 const app = express()
 const path = require('path')
 const { Server } = require('socket.io')
 
-const server = http.createServer(app)
+const options = {
+    key: fs.readFileSync(" /etc/letsencrypt/live/wa.darmasoft.biz.id/privkey.pem"),
+    cert: fs.readFileSync("/etc/letsencrypt/live/wa.darmasoft.biz.id/fullchain.pem"),
+  };
+  
+
+const server = https.createServer(options,app)
 
 const io = new Server(server, {
     cors: {
