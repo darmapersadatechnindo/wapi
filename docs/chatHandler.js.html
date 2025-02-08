@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: chatHandler.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: chatHandler.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const { sessions } = require('../sessions');
+
+/**
+ * Handles chat-related events for Socket.IO.
+ * @param {Socket} socket - The connected Socket.IO client.
+ */
+const chatHandler = (socket) => {
+  /**
+   * Gets information about a chat.
+   * @event getClassInfo
+   * @param {Object} data - Data payload.
+   * @param {string} data.sessionId - The session ID.
+   * @param {string} data.chatId - The chat ID.
+   * @param {Function} callback - Callback function to return response.
+   */
+  socket.on('getClassInfo', async ({ sessionId, chatId }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      callback({ success: true, chat });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Clears all messages in a chat.
+   * @event clearMessages
+   */
+  socket.on('clearMessages', async ({ sessionId, chatId }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      await chat.clearMessages();
+      callback({ success: true });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Clears typing or recording state in a chat.
+   * @event clearState
+   */
+  socket.on('clearState', async ({ sessionId, chatId }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      await chat.clearState();
+      callback({ success: true });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Deletes a chat.
+   * @event deleteChat
+   */
+  socket.on('deleteChat', async ({ sessionId, chatId }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      await chat.delete();
+      callback({ success: true });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Fetches messages from a chat.
+   * @event fetchMessages
+   */
+  socket.on('fetchMessages', async ({ sessionId, chatId, searchOptions }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      const messages = await chat.fetchMessages(searchOptions);
+      callback({ success: true, messages });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Gets the contact for a chat.
+   * @event getContact
+   */
+  socket.on('getContact', async ({ sessionId, chatId }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      const contact = await chat.getContact();
+      callback({ success: true, contact });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Sends a recording state.
+   * @event sendStateRecording
+   */
+  socket.on('sendStateRecording', async ({ sessionId, chatId }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      await chat.sendStateRecording();
+      callback({ success: true });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Sends a typing state.
+   * @event sendStateTyping
+   */
+  socket.on('sendStateTyping', async ({ sessionId, chatId }, callback) => {
+    try {
+      const client = sessions.get(sessionId);
+      const chat = await client.getChatById(chatId);
+      if (!chat) return callback({ success: false, error: 'Chat not Found' });
+      await chat.sendStateTyping();
+      callback({ success: true });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+};
+
+module.exports = {chatHandler};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Events</h3><ul><li><a href="global.html#event:acceptInvite">acceptInvite</a></li><li><a href="global.html#event:block">block</a></li><li><a href="global.html#event:clearMessages">clearMessages</a></li><li><a href="global.html#event:clearState">clearState</a></li><li><a href="global.html#event:createGroup">createGroup</a></li><li><a href="global.html#event:deleteChat">deleteChat</a></li><li><a href="global.html#event:fetchMessages">fetchMessages</a></li><li><a href="global.html#event:getAbout">getAbout</a></li><li><a href="global.html#event:getChat">getChat</a></li><li><a href="global.html#event:getChats">getChats</a></li><li><a href="global.html#event:getClassInfo">getClassInfo</a></li><li><a href="global.html#event:getContact">getContact</a></li><li><a href="global.html#event:getContacts">getContacts</a></li><li><a href="global.html#event:getCountryCode">getCountryCode</a></li><li><a href="global.html#event:getFormattedNumber">getFormattedNumber</a></li><li><a href="global.html#event:getProfilePicUrl">getProfilePicUrl</a></li><li><a href="global.html#event:getWWebVersion">getWWebVersion</a></li><li><a href="global.html#event:isRegisteredUser">isRegisteredUser</a></li><li><a href="global.html#event:sendMessage">sendMessage</a></li><li><a href="global.html#event:sendStateRecording">sendStateRecording</a></li><li><a href="global.html#event:sendStateTyping">sendStateTyping</a></li><li><a href="global.html#event:setStatus">setStatus</a></li><li><a href="global.html#event:unblock">unblock</a></li></ul><h3>Global</h3><ul><li><a href="global.html#chatHandler">chatHandler</a></li><li><a href="global.html#clientHandler">clientHandler</a></li><li><a href="global.html#contactHandler">contactHandler</a></li><li><a href="global.html#messageHandler">messageHandler</a></li><li><a href="global.html#registerHandlers">registerHandlers</a></li><li><a href="global.html#sessionHandler">sessionHandler</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 08 2025 20:22:59 GMT+0700 (Western Indonesia Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

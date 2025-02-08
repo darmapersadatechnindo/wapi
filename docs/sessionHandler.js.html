@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: sessionHandler.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: sessionHandler.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const qr = require('qr-image');
+const QRCode = require('qrcode');
+const { setupSession, deleteSession, reloadSession, validateSession, flushSessions, sessions } = require('../sessions');
+const { sendErrorResponse, waitForNestedObject } = require('../utils');
+
+/**
+ * Handles session-related events for Socket.IO.
+ * @param {Socket} socket - The connected Socket.IO client.
+ */
+const sessionHandler = (socket) => {
+  
+  /**
+   * Starts a new session.
+   * @param {Object} data - The session data.
+   * @param {string} data.sessionId - The session ID.
+   */
+  socket.on('startSession', async (data) => {
+    try {
+      const { sessionId } = data;
+      const setupSessionReturn = setupSession(sessionId);
+      if (!setupSessionReturn.success) {
+        socket.emit('sessionError', { success: false, message: setupSessionReturn.message });
+        return;
+      }
+      await waitForNestedObject(setupSessionReturn.client, 'pupPage');
+      socket.emit('sessionStarted', { success: true, message: setupSessionReturn.message });
+    } catch (error) {
+      socket.emit('sessionError', { success: false, message: error.message });
+    }
+  });
+
+  /**
+   * Gets the status of a session.
+   * @param {Object} data - The session data.
+   * @param {string} data.sessionId - The session ID.
+   */
+  socket.on('statusSession', async (data) => {
+    try {
+      const { sessionId } = data;
+      const sessionData = await validateSession(sessionId);
+      socket.emit('sessionStatus', sessionData);
+    } catch (error) {
+      socket.emit('sessionError', { success: false, message: error.message });
+    }
+  });
+
+  /**
+   * Gets the QR code for a session.
+   * @param {Object} data - The session data.
+   * @param {string} data.sessionId - The session ID.
+   */
+  socket.on('sessionQrCode', async (data) => {
+    try {
+      const { sessionId } = data;
+      const session = sessions.get(sessionId);
+      if (!session) {
+        socket.emit('sessionError', { success: false, message: 'session_not_found' });
+        return;
+      }
+      if (session.qr) {
+        const qrImageUrl = await QRCode.toDataURL(session.qr);
+        socket.emit('sessionQrCode', { success: true, qr: qrImageUrl });
+      } else {
+        socket.emit('sessionError', { success: false, message: 'QR code not ready or already scanned' });
+      }
+    } catch (error) {
+      socket.emit('sessionError', { success: false, message: error.message });
+    }
+  });
+
+  /**
+   * Restarts a session.
+   * @param {Object} data - The session data.
+   * @param {string} data.sessionId - The session ID.
+   */
+  socket.on('restartSession', async (data) => {
+    try {
+      const { sessionId } = data;
+      const validation = await validateSession(sessionId);
+      if (validation.message === 'session_not_found') {
+        socket.emit('sessionError', validation);
+        return;
+      }
+      await reloadSession(sessionId);
+      socket.emit('sessionRestarted', { success: true, message: 'Restarted successfully' });
+    } catch (error) {
+      socket.emit('sessionError', { success: false, message: error.message });
+    }
+  });
+
+  /**
+   * Terminates a session.
+   * @param {Object} data - The session data.
+   * @param {string} data.sessionId - The session ID.
+   */
+  socket.on('terminateSession', async (data) => {
+    try {
+      const { sessionId } = data;
+      const validation = await validateSession(sessionId);
+      if (validation.message === 'session_not_found') {
+        socket.emit('sessionError', validation);
+        return;
+      }
+      await deleteSession(sessionId, validation);
+      socket.emit('sessionTerminated', { success: true, message: 'Logged out successfully' });
+    } catch (error) {
+      socket.emit('sessionError', { success: false, message: error.message });
+    }
+  });
+
+  /**
+   * Terminates all inactive sessions.
+   */
+  socket.on('terminateInactiveSessions', async () => {
+    try {
+      await flushSessions(true);
+      socket.emit('inactiveSessionsTerminated', { success: true, message: 'Flush completed successfully' });
+    } catch (error) {
+      socket.emit('sessionError', { success: false, message: error.message });
+    }
+  });
+
+  /**
+   * Terminates all sessions.
+   */
+  socket.on('terminateAllSessions', async () => {
+    try {
+      await flushSessions(false);
+      socket.emit('allSessionsTerminated', { success: true, message: 'Flush completed successfully' });
+    } catch (error) {
+      socket.emit('sessionError', { success: false, message: error.message });
+    }
+  });
+};
+
+module.exports = {sessionHandler};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Events</h3><ul><li><a href="global.html#event:acceptInvite">acceptInvite</a></li><li><a href="global.html#event:block">block</a></li><li><a href="global.html#event:clearMessages">clearMessages</a></li><li><a href="global.html#event:clearState">clearState</a></li><li><a href="global.html#event:createGroup">createGroup</a></li><li><a href="global.html#event:deleteChat">deleteChat</a></li><li><a href="global.html#event:fetchMessages">fetchMessages</a></li><li><a href="global.html#event:getAbout">getAbout</a></li><li><a href="global.html#event:getChat">getChat</a></li><li><a href="global.html#event:getChats">getChats</a></li><li><a href="global.html#event:getClassInfo">getClassInfo</a></li><li><a href="global.html#event:getContact">getContact</a></li><li><a href="global.html#event:getContacts">getContacts</a></li><li><a href="global.html#event:getCountryCode">getCountryCode</a></li><li><a href="global.html#event:getFormattedNumber">getFormattedNumber</a></li><li><a href="global.html#event:getProfilePicUrl">getProfilePicUrl</a></li><li><a href="global.html#event:getWWebVersion">getWWebVersion</a></li><li><a href="global.html#event:isRegisteredUser">isRegisteredUser</a></li><li><a href="global.html#event:sendMessage">sendMessage</a></li><li><a href="global.html#event:sendStateRecording">sendStateRecording</a></li><li><a href="global.html#event:sendStateTyping">sendStateTyping</a></li><li><a href="global.html#event:setStatus">setStatus</a></li><li><a href="global.html#event:unblock">unblock</a></li></ul><h3>Global</h3><ul><li><a href="global.html#chatHandler">chatHandler</a></li><li><a href="global.html#clientHandler">clientHandler</a></li><li><a href="global.html#contactHandler">contactHandler</a></li><li><a href="global.html#messageHandler">messageHandler</a></li><li><a href="global.html#registerHandlers">registerHandlers</a></li><li><a href="global.html#sessionHandler">sessionHandler</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 08 2025 20:22:59 GMT+0700 (Western Indonesia Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
