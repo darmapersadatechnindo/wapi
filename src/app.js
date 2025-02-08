@@ -6,7 +6,7 @@ const { restoreSessions,
     reloadSession,
     deleteSession,sessions } = require('./sessions')
 const { routes } = require('./routes')
-const fs = require('fs')
+
 // Konfigurasi middleware
 app.disable('x-powered-by')
 app.use(bodyParser.json({ limit: '50mb' })) // Sesuaikan limit sesuai kebutuhan
