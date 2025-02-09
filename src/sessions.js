@@ -149,7 +149,7 @@ const UpdateChats = async (client, sessionId) => {
     setTimeout(async () => {
       const chats = await client.getChats();
       const listChats = await Promise.all(chats.map(async (chat) => {
-        const lastMsg = chat.lastMessage?._data; // Cek jika lastMessage ada
+        const lastMsg = chat.lastMessage?._data;
         const msg = lastMsg?.type !== "chat"
           ? (lastMsg?.caption || null)
           : lastMsg?.body || null;
@@ -164,7 +164,7 @@ const UpdateChats = async (client, sessionId) => {
           pinned: chat.pinned || false,
           hasMedia: lastMsg?.hasMedia || false,
           unreadCount: chat.unreadCount,
-          timestamp: chat.lastMessage?.timestamp,
+          timestamp: lastMsg?.timestamp,
         };
       }));
       io.emit("waClient", { event: "chats", sessionId, data: listChats })
@@ -172,18 +172,7 @@ const UpdateChats = async (client, sessionId) => {
   }
 };
 const updateMessage = async (client, chatId, sessionId) => {
-  const validation = await validateSession(sessionId)
-  if (validation.message === 'Not Found') {
-    triggerWebhook("waClient", sessionId, "getcontact", validation.message)
-    return
-  }
-
-  const contact = await client.getContactById(chatId)
-  const foto = await contact.getProfilePicUrl();
-  const chat = await client.getChatById(chatId)
-  const chats = await chat.fetchMessages({ limit: 50 })
-  const data = { ...contact, foto, chats }
-  io.emit("waClient", { event: "getcontact", sessionId, data: data })
+  
 }
 const initializeEvents = (client, sessionId) => {
   // check if the session webhook is overridden
