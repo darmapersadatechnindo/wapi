@@ -148,6 +148,7 @@ const UpdateChats = async (client, sessionId) => {
   if (state && state === "CONNECTED") {
     setTimeout(async () => {
       const chats = await client.getChats();
+      console.log(chats)
       const listChats = await Promise.all(chats.map(async (chat) => {
         const lastMsg = chat.lastMessage?._data;
         const msg = lastMsg?.type !== "chat"
