@@ -144,35 +144,35 @@ const setupSession = (sessionId) => {
   }
 }
 const UpdateChats = async (client, sessionId) => {
-  const state = await client.getState();
-  if (state && state === "CONNECTED") {
-    const chats = await client.getChats();
-    //console.log(chats)
-    const listChats = await Promise.all(chats.map(async (chat) => {
-      const lastMsg = chat.lastMessage?._data;
-      const msg = lastMsg?.type !== "chat"
-        ? (lastMsg?.caption || null)
-        : lastMsg?.body || null;
+  setTimeout(async () => {
+    const state = await client.getState()
+    if (state && state === "CONNECTED") {
+      const chats = await client.getChats();
 
-      return {
-        id: chat.id._serialized,
-        name: chat.name,
-        fromMe: lastMsg?.id?.fromMe || false,
-        message: msg,
-        ack: lastMsg?.ack || 0,
-        Type: lastMsg?.type || "unknown",
-        pinned: chat.pinned || false,
-        hasMedia: lastMsg?.hasMedia || false,
-        unreadCount: chat.unreadCount,
-        timestamp: chat.timestamp,
-      };
-    }));
-    io.emit("waClient", { event: "chats", sessionId, data: {chats,listChats} })
-  }
+      const listChats = await Promise.all(chats.map(async (chat) => {
+        const lastMsg = chat.lastMessage?._data;
+        const msg = lastMsg?.type !== "chat"
+          ? (lastMsg?.caption || null)
+          : lastMsg?.body || null;
+
+        return {
+          id: chat.id._serialized,
+          name: chat.name,
+          fromMe: lastMsg?.id?.fromMe || false,
+          message: msg,
+          ack: lastMsg?.ack || 0,
+          Type: lastMsg?.type || "unknown",
+          pinned: chat.pinned || false,
+          hasMedia: lastMsg?.hasMedia || false,
+          unreadCount: chat.unreadCount,
+          timestamp: chat.timestamp,
+        };
+      }));
+      io.emit("waClient", { event: "chats", sessionId, data: listChats })
+    }
+  }, 500);
 };
-const updateMessage = async (client, chatId, sessionId) => {
 
-}
 const initializeEvents = (client, sessionId) => {
   // check if the session webhook is overridden
   const sessionWebhook = process.env[sessionId.toUpperCase() + '_WEBHOOK_URL'] || baseWebhookURL
@@ -312,12 +312,9 @@ const initializeEvents = (client, sessionId) => {
         }
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message.from, sessionId)
+          
         }, 500);
-        if (setMessagesAsSeen) {
-          const chat = await message.getChat()
-          chat.sendSeen()
-        }
+        
       })
     })
 
@@ -326,14 +323,9 @@ const initializeEvents = (client, sessionId) => {
       client.on('message_ack', async (message, ack) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_ack', { message, ack })
         io.emit("waClient", { event: "message_ack", sessionId, data: { message, ack } })
-
-        if (setMessagesAsSeen) {
-          const chat = await message.getChat()
-          chat.sendSeen()
-        }
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
@@ -343,13 +335,10 @@ const initializeEvents = (client, sessionId) => {
       client.on('message_create', async (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_create', { message })
         io.emit("waClient", { event: "message_ack", sessionId, data: message })
-        if (setMessagesAsSeen) {
-          const chat = await message.getChat()
-          chat.sendSeen()
-        }
+        
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
@@ -372,7 +361,7 @@ const initializeEvents = (client, sessionId) => {
         io.emit("waClient", { event: "message_edit", sessionId, data: { message, newBody, prevBody } })
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
@@ -384,7 +373,7 @@ const initializeEvents = (client, sessionId) => {
         io.emit("waClient", { event: "message_ciphertext", sessionId, data: message })
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
@@ -398,7 +387,7 @@ const initializeEvents = (client, sessionId) => {
         io.emit("waClient", { event: "message_revoke_everyone", sessionId, data: message })
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+         
         }, 500);
       })
     })
@@ -410,7 +399,7 @@ const initializeEvents = (client, sessionId) => {
         io.emit("waClient", { event: "message_revoke_me", sessionId, data: message })
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
@@ -449,7 +438,7 @@ const initializeEvents = (client, sessionId) => {
         io.emit("waClient", { event: "chat_removed", sessionId, data: chat })
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
@@ -461,7 +450,7 @@ const initializeEvents = (client, sessionId) => {
         io.emit("waClient", { event: "chat_archived", sessionId, data: { chat, currState, prevState } })
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
@@ -473,7 +462,7 @@ const initializeEvents = (client, sessionId) => {
         io.emit("waClient", { event: "unread_count", sessionId, data: chat })
         setTimeout(() => {
           UpdateChats(client, sessionId)
-          updateMessage(client, message._data.id.remote, sessionId)
+          
         }, 500);
       })
     })
