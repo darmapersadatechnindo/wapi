@@ -146,34 +146,32 @@ const setupSession = (sessionId) => {
 const UpdateChats = async (client, sessionId) => {
   const state = await client.getState();
   if (state && state === "CONNECTED") {
-    setTimeout(async () => {
-      const chats = await client.getChats();
-      //console.log(chats)
-      const listChats = await Promise.all(chats.map(async (chat) => {
-        const lastMsg = chat.lastMessage?._data;
-        const msg = lastMsg?.type !== "chat"
-          ? (lastMsg?.caption || null)
-          : lastMsg?.body || null;
+    const chats = await client.getChats();
+    //console.log(chats)
+    const listChats = await Promise.all(chats.map(async (chat) => {
+      const lastMsg = chat.lastMessage?._data;
+      const msg = lastMsg?.type !== "chat"
+        ? (lastMsg?.caption || null)
+        : lastMsg?.body || null;
 
-        return {
-          id: chat.id._serialized,
-          name: chat.name,
-          fromMe: lastMsg?.id?.fromMe || false,
-          message: msg,
-          ack: lastMsg?.ack || 0,
-          Type: lastMsg?.type || "unknown",
-          pinned: chat.pinned || false,
-          hasMedia: lastMsg?.hasMedia || false,
-          unreadCount: chat.unreadCount,
-          timestamp: chat.timestamp,
-        };
-      }));
-      io.emit("waClient", { event: "chats", sessionId, data: listChats })
-    }, 1000);
+      return {
+        id: chat.id._serialized,
+        name: chat.name,
+        fromMe: lastMsg?.id?.fromMe || false,
+        message: msg,
+        ack: lastMsg?.ack || 0,
+        Type: lastMsg?.type || "unknown",
+        pinned: chat.pinned || false,
+        hasMedia: lastMsg?.hasMedia || false,
+        unreadCount: chat.unreadCount,
+        timestamp: chat.timestamp,
+      };
+    }));
+    io.emit("waClient", { event: "chats", sessionId, data: {chats,listChats} })
   }
 };
 const updateMessage = async (client, chatId, sessionId) => {
-  
+
 }
 const initializeEvents = (client, sessionId) => {
   // check if the session webhook is overridden
