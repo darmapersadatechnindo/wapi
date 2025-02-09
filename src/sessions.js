@@ -165,7 +165,7 @@ const UpdateChats = async (client, sessionId) => {
           pinned: chat.pinned || false,
           hasMedia: lastMsg?.hasMedia || false,
           unreadCount: chat.unreadCount,
-          timestamp: lastMsg?.timestamp,
+          timestamp: chat.timestamp,
         };
       }));
       io.emit("waClient", { event: "chats", sessionId, data: listChats })
